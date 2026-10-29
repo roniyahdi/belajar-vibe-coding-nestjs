@@ -71,5 +71,17 @@ describe('AppController & UsersRoute (e2e)', () => {
         .expect(400)
         .expect({ error: 'Email sudah terdaftar' });
     });
+
+    it('should return 400 error when email format is invalid', () => {
+      return request(app.getHttpServer())
+        .post('/api/users')
+        .send({
+          name: 'Roni',
+          email: 'invalid-email-format',
+          password: 'rahasia',
+        })
+        .expect(400)
+        .expect({ error: 'Format email tidak valid' });
+    });
   });
 });

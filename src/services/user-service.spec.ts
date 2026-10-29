@@ -74,4 +74,10 @@ describe('UserService', () => {
 
     expect(mockPrismaService.user.create).not.toHaveBeenCalled();
   });
+
+  it('should throw validation error when email format is invalid', async () => {
+    await expect(
+      service.register('Roni', 'bukan-email', 'rahasia'),
+    ).rejects.toThrow();
+  });
 });

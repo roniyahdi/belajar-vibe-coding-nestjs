@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UsersRoute } from './users-route';
 import { UserService } from '../services/user-service';
 import { HttpException, HttpStatus } from '@nestjs/common';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { RegisterUserSchema } from '../validations/user-validation';
 
 describe('UsersRoute', () => {
   let controller: UsersRoute;
@@ -33,18 +35,16 @@ describe('UsersRoute', () => {
   it('should register a new user successfully and return { data: "OK" }', async () => {
     mockUserService.register.mockResolvedValue('OK');
 
-    const result = await controller.register({
+    const payload = {
       name: 'Roni',
       email: 'roni@gmail.com',
       password: 'rahasia',
-    });
+    };
+
+    const result = await controller.register(payload);
 
     expect(result).toEqual({ data: 'OK' });
-    expect(mockUserService.register).toHaveBeenCalledWith(
-      'Roni',
-      'roni@gmail.com',
-      'rahasia',
-    );
+    expect(mockUserService.register).toHaveBeenCalledWith(payload);
   });
 
   it('should throw HttpException 400 when registration fails', async () => {
@@ -64,5 +64,41 @@ describe('UsersRoute', () => {
         HttpStatus.BAD_REQUEST,
       ),
     );
+  });
+
+  describe('ZodValidationPipe', () => {
+    const pipe = new ZodValidationPipe(RegisterUserSchema);
+
+    it('should pass valid data', () => {
+      const validData = {
+        name: 'Roni',
+        email: 'roni@gmail.com',
+        password: 'rahasia',
+      };
+      expect(pipe.transform(validData, { type: 'body' })).toEqual(validData);
+    });
+
+    it('should throw HttpException 400 for invalid email format', () => {
+      const invalidData = {
+        name: 'Roni',
+        email: 'invalid-email',
+        password: 'rahasia',
+      };
+      expect(() => pipe.transform(invalidData, { type: 'body' })).toThrow(
+        new HttpException(
+          { error: 'Format email tidak valid' },
+          HttpStatus.BAD_REQUEST,
+        ),
+      );
+    });
+
+    it('should throw HttpException 400 when required fields are missing', () => {
+      const invalidData = {
+        email: 'roni@gmail.com',
+      };
+      expect(() => pipe.transform(invalidData, { type: 'body' })).toThrow(
+        HttpException,
+      );
+    });
   });
 });
