@@ -7,3 +7,10 @@ export const RegisterUserSchema = z.object({
 });
 
 export type RegisterUserDto = z.infer<typeof RegisterUserSchema>;
+
+export const LoginUserSchema = z.object({
+  email: z.string().email('Format email tidak valid').max(255),
+  password: z.string().min(1, 'Password is required').max(255),
+});
+
+export type LoginUserDto = z.infer<typeof LoginUserSchema>;

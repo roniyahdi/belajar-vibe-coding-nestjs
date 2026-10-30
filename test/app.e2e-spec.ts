@@ -17,7 +17,8 @@ describe('AppController & UsersRoute (e2e)', () => {
     await app.init();
 
     prisma = app.get<PrismaService>(PrismaService);
-    // Clean up test user if exists
+    // Clean up test user and session if exists
+    await prisma.session.deleteMany().catch(() => {});
     await prisma.user
       .deleteMany({
         where: { email: 'e2e-test@gmail.com' },
@@ -26,6 +27,7 @@ describe('AppController & UsersRoute (e2e)', () => {
   });
 
   afterAll(async () => {
+    await prisma.session.deleteMany().catch(() => {});
     await prisma.user
       .deleteMany({
         where: { email: 'e2e-test@gmail.com' },
@@ -42,9 +44,7 @@ describe('AppController & UsersRoute (e2e)', () => {
   });
 
   it('/health (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/health')
-      .expect(200);
+    return request(app.getHttpServer()).get('/health').expect(200);
   });
 
   describe('/api/users (POST)', () => {
@@ -77,6 +77,65 @@ describe('AppController & UsersRoute (e2e)', () => {
         .post('/api/users')
         .send({
           name: 'Roni',
+          email: 'invalid-email-format',
+          password: 'rahasia',
+        })
+        .expect(400)
+        .expect({ error: 'Format email tidak valid' });
+    });
+  });
+
+  describe('/api/users/login (POST)', () => {
+    it('should login successfully with correct credentials and return token', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/users/login')
+        .send({
+          email: 'e2e-test@gmail.com',
+          password: 'rahasia',
+        })
+        .expect(201);
+
+      expect(response.body).toHaveProperty('data');
+      expect(typeof response.body.data).toBe('string');
+      // Verify UUID v4 format
+      expect(response.body.data).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      );
+
+      // Verify token exists in database session
+      const session = await prisma.session.findFirst({
+        where: { token: response.body.data },
+      });
+      expect(session).not.toBeNull();
+      expect(session?.token).toBe(response.body.data);
+    });
+
+    it('should return 400 error when password is incorrect', () => {
+      return request(app.getHttpServer())
+        .post('/api/users/login')
+        .send({
+          email: 'e2e-test@gmail.com',
+          password: 'wrong-password',
+        })
+        .expect(400)
+        .expect({ error: 'Email atau password salah' });
+    });
+
+    it('should return 400 error when email is not registered', () => {
+      return request(app.getHttpServer())
+        .post('/api/users/login')
+        .send({
+          email: 'notfound@gmail.com',
+          password: 'rahasia',
+        })
+        .expect(400)
+        .expect({ error: 'Email atau password salah' });
+    });
+
+    it('should return 400 error when email format is invalid', () => {
+      return request(app.getHttpServer())
+        .post('/api/users/login')
+        .send({
           email: 'invalid-email-format',
           password: 'rahasia',
         })
